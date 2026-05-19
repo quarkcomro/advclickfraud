@@ -99,7 +99,7 @@
                             <td>
                                 {if $log.fraud_score >= 70}
                                     <span class="label label-danger">Fraudă Critică (Blochează)</span>
-                                {elif $log.is_bot}
+                                {elseif $log.is_bot}
                                     <span class="label label-warning">Bot Automatizat</span>
                                 {else}
                                     <span class="label label-success">Utilizator Legitim</span>
