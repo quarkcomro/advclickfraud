@@ -8,8 +8,8 @@ class ClickFraudLog extends ObjectModel
         $referrer = isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '';
         
         // Analiză euristică bot din User-Agent
-        $isBot = (preg_php = preg_match('/bot|crawl|slurp|spider|mediapartners|headless/i', $userAgent)) ? 1 : 0;
-        
+        $isBot = preg_match('/bot|crawl|slurp|spider|mediapartners|headless/i', $userAgent) ? 1 : 0;
+
         // Determinare scor de fraudă inițial
         $fraudScore = 0;
         if ($isBot) $fraudScore += 60;
