@@ -1,0 +1,30 @@
+.adv-stats-row {
+    margin-top: 20px;
+    margin-bottom: 20px;
+}
+.metric-card {
+    padding: 20px;
+    border-radius: 5px;
+    color: #fff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.metric-title {
+    display: block;
+    font-size: 13px;
+    text-transform: uppercase;
+    opacity: 0.8;
+    font-weight: bold;
+}
+.metric-value {
+    display: block;
+    font-size: 28px;
+    font-weight: bold;
+    margin-top: 5px;
+}
+.card-blue { background-color: #2eacd5; }
+.card-red { background-color: #f24c52; }
+.card-orange { background-color: #f0ad4e; }
+.card-green { background-color: #27c24c; }
+.progress-bar-danger { background-color: #d9534f !important; }
+.progress-bar-warning { background-color: #f0ad4e !important; }
+.progress-bar-success { background-color: #5cb85c !important; }
