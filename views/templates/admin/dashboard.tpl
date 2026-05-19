@@ -1,130 +1,165 @@
-<div class="panel">
-    <div class="panel-heading">
-        <i class="icon-shield"></i> {l s='Advanced Click Fraud Monitoring Dashboard' mod='advclickfraud'}
-    </div>
-    
-    <!-- Row Statisici Globale -->
-    <div class="row adv-stats-row">
-        <div class="col-md-3">
-            <div class="metric-card card-blue">
-                <span class="metric-title">Total Click-uri Reclame</span>
-                <span class="metric-value">{$stats.total_clicks|intval}</span>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="metric-card card-red">
-                <span class="metric-title">Click-uri Frauduloase Detectate</span>
-                <span class="metric-value">{$stats.total_fraud|intval}</span>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="metric-card card-orange">
-                <span class="metric-title">Boți / Crawlers Identificați</span>
-                <span class="metric-value">{$stats.bot_count|intval}</span>
-            </div>
-        </div>
-        <div class="col-md-3">
-            <div class="metric-card card-green">
-                <span class="metric-title">Timp Mediu pe Site (Secunde)</span>
-                <span class="metric-value">{$stats.avg_duration|round}s</span>
-            </div>
-        </div>
-    </div>
-</div>
+<?php
+class ClickFraudLog extends ObjectModel
+{
+    public static function evaluateVisitor($ip, $is_ad_click, $gclid, $utm_source, $is_product_page)
+    {
+        $db = Db::getInstance();
+        $userAgent = isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '';
+        $referrer = isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '';
+        
+        $isBot = preg_match('/bot|crawl|slurp|spider|mediapartners|headless|curl|wget/i', $userAgent) ? 1 : 0;
+        $timeWindow = (int)Configuration::get('ADVCLICKFRAUD_TIME_WINDOW');
+        $dateThreshold = date('Y-m-d H:i:s', time() - $timeWindow);
 
-<!-- Configurare Reguli de Filtrare -->
-<div class="panel">
-    <div class="panel-heading"><i class="icon-cogs"></i> {l s='Setări Algoritm Detecție' mod='advclickfraud'}</div>
-    <form action="{$form_action|escape:'html':'UTF-8'}" method="post" class="form-horizontal">
-        <div class="form-group">
-            <label class="control-label col-lg-3">Limită click-uri per IP</label>
-            <div class="col-lg-3">
-                <input type="number" name="ADVCLICKFRAUD_CLICK_LIMIT" value="{$click_limit|intval}" class="form-control" />
-                <p class="help-block">Numărul maxim de click-uri dintr-o reclamă într-o fereastră temporală înainte de marcare ca fraudă.</p>
-            </div>
-        </div>
-        <div class="form-group">
-            <label class="control-label col-lg-3">Fereastră temporală de monitorizare (secunde)</label>
-            <div class="col-lg-3">
-                <input type="number" name="ADVCLICKFRAUD_TIME_WINDOW" value="{$time_window|intval}" class="form-control" />
-            </div>
-        </div>
-        <div class="panel-footer">
-            <button type="submit" name="submit_adv_config" class="btn btn-default pull-right"><i class="process-icon-save"></i> Salvează</button>
-        </div>
-    </form>
-</div>
+        $existingLog = $db->getRow('SELECT * FROM `' . _DB_PREFIX_ . 'adv_click_fraud_logs` WHERE `ip_address` = "' . pSQL($ip) . '" AND `date_add` >= "' . pSQL($dateThreshold) . '"');
+        $existingSession = $db->getRow('SELECT * FROM `' . _DB_PREFIX_ . 'adv_click_fraud_sessions` WHERE `ip_address` = "' . pSQL($ip) . '"');
 
-<!-- Afișarea URL-ului de Export -->
-<div class="panel">
-    <div class="panel-heading"><i class="icon-link"></i> {l s='Integrare și Automatizare Google Ads' mod='advclickfraud'}</div>
-    <div class="alert alert-info">
-        <p>Folosește URL-ul de mai jos în scripturile tale de automatizare sau în instrumentele de rețea pentru a prelua în timp real lista IP-urilor marcate cu <strong>Fraudă Critică</strong>:</p>
-        <br/>
-        <code style="font-size: 14px; padding: 10px; display: block; word-break: break-all;">{$export_link}</code>
-    </div>
-</div>
+        $fraudScore = $isBot ? 75 : 0;
+        $isScraper = 0;
 
+        // LOGICĂ DETECȚIE SCRAPERI DE PREȚURI
+        if ($is_product_page) {
+            // Numărăm câte pagini de produs a accesat acest IP în ultima oră
+            if ($existingSession) {
+                $visitedPages = json_decode($existingSession['pages_visited'], true);
+                $productPagesCount = is_array($visitedPages) ? count($visitedPages) : 0;
+                $scrapeLimit = (int)Configuration::get('ADVCLICKFRAUD_SCRAPE_LIMIT');
 
-<!-- Jurnal detaliat de analiză -->
-<div class="panel">
-    <div class="panel-heading">
-        <i class="icon-list"></i> {l s='Jurnal detaliat în timp real al amenințărilor' mod='advclickfraud'}
-    </div>
-    <div class="table-responsive">
-        <table class="table table-bordered">
-            <thead>
-                <tr class="nodrag nodrop">
-                    <th><span class="title_box">Adresă IP</span></th>
-                    <th><span class="title_box">Sursă/Campanie</span></th>
-                    <th><span class="title_box">Număr Click-uri</span></th>
-                    <th><span class="title_box">Timp pe site</span></th>
-                    <th><span class="title_box">Interacțiune (Mouse / Taste)</span></th>
-                    <th><span class="title_box">Rezoluție Ecran</span></th>
-                    <th><span class="title_box">Scor Fraudă</span></th>
-                    <th><span class="title_box">Tip Risc</span></th>
-                    <th><span class="title_box">Ultima vizită</span></th>
-                </tr>
-            </thead>
-            <tbody>
-                {if $logs}
-                    {foreach from=$logs item=log}
-                        <tr>
-                            <td><strong>{$log.ip_address|escape:'html':'UTF-8'}</strong></td>
-                            <td><span class="label label-info">{$log.utm_source|escape:'html':'UTF-8'}</span></td>
-                            <td><span class="badge">{$log.click_count|intval}</span></td>
-                            <td>{$log.duration|intval} secunde</td>
-                            <td>
-                                <i class="icon-mouse-pointer"></i> {$log.mouse_movements|intval} M | 
-                                <i class="icon-keyboard-o"></i> {$log.key_presses|intval} K
-                            </td>
-                            <td>{$log.screen_resolution|escape:'html':'UTF-8'}</td>
-                            <td>
-                                <div class="progress" style="margin-bottom:0;">
-                                    <div class="progress-bar {if $log.fraud_score >= 70}progress-bar-danger{elseif $log.fraud_score >= 40}progress-bar-warning{else}progress-bar-success{/if}"
-                                         role="progressbar" style="width: {$log.fraud_score|intval}%;">
-                                        {$log.fraud_score|intval}%
-                                    </div>
-                                </div>
-                            </td>
-                            <td>
-                                {if $log.fraud_score >= 70}
-                                    <span class="label label-danger">Fraudă Critică (Blochează)</span>
-                                {elseif $log.is_bot}
-                                    <span class="label label-warning">Bot Automatizat</span>
-                                {else}
-                                    <span class="label label-success">Utilizator Legitim</span>
-                                {/if}
-                            </td>
-                            <td>{$log.date_upd|escape:'html':'UTF-8'}</td>
-                        </tr>
-                    {/foreach}
-                {else}
-                    <tr>
-                        <td colspan="9" class="text-center">{l s='Nu s-au înregistrat click-uri suspecte din campanii publicitare.' mod='advclickfraud'}</td>
-                    </tr>
-                {/if}
-            </tbody>
-        </table>
-    </div>
-</div>
+                if ($productPagesCount > $scrapeLimit) {
+                    $isScraper = 1;
+                    $fraudScore = max($fraudScore, 90); // Scraperii agresivi primesc direct scor penalizator mare
+                }
+            }
+        }
+
+        if ($existingLog) {
+            $newClickCount = (int)$existingLog['click_count'] + ($is_ad_click ? 1 : 0);
+            $limit = (int)Configuration::get('ADVCLICKFRAUD_CLICK_LIMIT');
+            
+            $extraScore = ($newClickCount > $limit) ? 40 : 10;
+
+            // Verificare istoric telemetrie bazat pe constantele din UI
+            if ($existingSession && (int)$existingSession['mouse_movements'] == 0 && (int)$existingSession['duration'] <= (int)Configuration::get('ADVCLICKFRAUD_MIN_DURATION')) {
+                $extraScore += 30; 
+            }
+
+            $finalScore = min(100, (int)$existingLog['fraud_score'] + $extraScore);
+            if ($isScraper) {
+                $finalScore = 100;
+            }
+
+            $db->update('adv_click_fraud_logs', [
+                'click_count' => $newClickCount,
+                'fraud_score' => $finalScore,
+                'is_scraper' => (int)($existingLog['is_scraper'] || $isScraper),
+                'date_upd' => date('Y-m-d H:i:s')
+            ], 'id_log = ' . (int)$existingLog['id_log']);
+        } else {
+            if ($is_ad_click) {
+                $db->insert('adv_click_fraud_logs', [
+                    'ip_address' => pSQL($ip),
+                    'gclid' => pSQL($gclid),
+                    'utm_source' => $utm_source ? pSQL($utm_source) : 'google_ads',
+                    'user_agent' => pSQL($userAgent),
+                    'referrer' => pSQL($referrer),
+                    'is_bot' => (int)$isBot,
+                    'is_scraper' => (int)$isScraper,
+                    'fraud_score' => (int)$fraudScore,
+                    'date_add' => date('Y-m-d H:i:s'),
+                    'date_upd' => date('Y-m-d H:i:s')
+                ]);
+            } elseif ($isScraper) {
+                // Înregistrăm scraperul chiar dacă nu a venit din reclame
+                $db->insert('adv_click_fraud_logs', [
+                    'ip_address' => pSQL($ip),
+                    'user_agent' => pSQL($userAgent),
+                    'is_scraper' => 1,
+                    'fraud_score' => 100,
+                    'date_add' => date('Y-m-d H:i:s'),
+                    'date_upd' => date('Y-m-d H:i:s')
+                ]);
+            }
+        }
+    }
+
+    public static function updateSessionTelemetry($token, $ip, $data)
+    {
+        $db = Db::getInstance();
+        $existingSession = $db->getRow('SELECT * FROM `' . _DB_PREFIX_ . 'adv_click_fraud_sessions` WHERE `session_token` = "' . pSQL($token) . '"');
+
+        $currentPage = isset($data['page']) ? $data['page'] : '';
+        $resolution = isset($data['resolution']) ? $data['resolution'] : '';
+        $mouseMoves = isset($data['mouseMoves']) ? (int)$data['mouseMoves'] : 0;
+        $keyPresses = isset($data['keyPresses']) ? (int)$data['keyPresses'] : 0;
+        $duration = isset($data['duration']) ? (int)$data['duration'] : 0;
+
+        if ($existingSession) {
+            $visitedPages = json_decode($existingSession['pages_visited'], true);
+            if (!is_array($visitedPages)) $visitedPages = [];
+            if (!in_array($currentPage, $visitedPages) && !empty($currentPage)) {
+                $visitedPages[] = $currentPage;
+            }
+
+            $db->update('adv_click_fraud_sessions', [
+                'duration' => (int)$duration,
+                'pages_visited' => pSQL(json_encode($visitedPages)),
+                'mouse_movements' => (int)($existingSession['mouse_movements'] + $mouseMoves),
+                'key_presses' => (int)($existingSession['key_presses'] + $keyPresses),
+                'date_upd' => date('Y-m-d H:i:s')
+            ], 'id_session = ' . (int)$existingSession['id_session']);
+        } else {
+            $visitedPages = !empty($currentPage) ? json_encode([$currentPage]) : json_encode([]);
+            $db->insert('adv_click_fraud_sessions', [
+                'ip_address' => pSQL($ip),
+                'session_token' => pSQL($token),
+                'duration' => (int)$duration,
+                'pages_visited' => pSQL($visitedPages),
+                'mouse_movements' => (int)$mouseMoves,
+                'key_presses' => (int)$keyPresses,
+                'screen_resolution' => pSQL($resolution),
+                'date_add' => date('Y-m-d H:i:s'),
+                'date_upd' => date('Y-m-d H:i:s')
+            ]);
+        }
+
+        // EVALUARE INACTIVITATE DIN CONSTANTE DINAMICE UI
+        $minD = (int)Configuration::get('ADVCLICKFRAUD_MIN_DURATION');
+        $maxD = (int)Configuration::get('ADVCLICKFRAUD_MAX_DURATION');
+
+        if ($duration > $minD && $duration < $maxD && $mouseMoves == 0 && $keyPresses == 0) {
+            $db->execute('UPDATE `' . _DB_PREFIX_ . 'adv_click_fraud_logs` SET `fraud_score` = LEAST(100, `fraud_score` + 25) WHERE `ip_address` = "' . pSQL($ip) . '"');
+        }
+    }
+
+    public static function cleanOldLogs()
+    {
+        $days = (int)Configuration::get('ADVCLICKFRAUD_RETENTION_DAYS');
+        if ($days <= 0) $days = 30;
+        
+        $dateLimit = date('Y-m-d H:i:s', strtotime("-$days days"));
+        
+        Db::getInstance()->execute('DELETE FROM `' . _DB_PREFIX_ . 'adv_click_fraud_logs` WHERE `date_upd` < "' . pSQL($dateLimit) . '"');
+        Db::getInstance()->execute('DELETE FROM `' . _DB_PREFIX_ . 'adv_click_fraud_sessions` WHERE `date_upd` < "' . pSQL($dateLimit) . '"');
+    }
+
+    public static function getAllLogs($limit = 50)
+    {
+        return Db::getInstance()->executeS('
+            SELECT l.*, s.duration, s.mouse_movements, s.key_presses, s.screen_resolution 
+            FROM `' . _DB_PREFIX_ . 'adv_click_fraud_logs` l
+            LEFT JOIN `' . _DB_PREFIX_ . 'adv_click_fraud_sessions` s ON l.ip_address = s.ip_address
+            ORDER BY l.date_upd DESC LIMIT ' . (int)$limit
+        );
+    }
+
+    public static function getGlobalStats()
+    {
+        $db = Db::getInstance();
+        return [
+            'total_clicks' => (int)$db->getValue('SELECT SUM(click_count) FROM `' . _DB_PREFIX_ . 'adv_click_fraud_logs`'),
+            'total_fraud' => (int)$db->getValue('SELECT COUNT(*) FROM `' . _DB_PREFIX_ . 'adv_click_fraud_logs` WHERE `fraud_score` >= 70'),
+            'avg_duration' => (int)$db->getValue('SELECT AVG(duration) FROM `' . _DB_PREFIX_ . 'adv_click_fraud_sessions`'),
+            'bot_count' => (int)$db->getValue('SELECT COUNT(*) FROM `' . _DB_PREFIX_ . 'adv_click_fraud_logs` WHERE `is_bot` = 1 OR `is_scraper` = 1')
+        ];
+    }
+}
