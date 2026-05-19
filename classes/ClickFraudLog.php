@@ -1,55 +1,88 @@
 <?php
+if (!defined('_PS_VERSION_')) {
+    exit;
+}
+
 class ClickFraudLog extends ObjectModel
 {
-    public static function logAdClick($ip, $gclid, $utm_source)
+    public static function evaluateVisitor($ip, $is_ad_click, $gclid, $utm_source, $is_product_page)
     {
         $db = Db::getInstance();
         $userAgent = isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '';
         $referrer = isset($_SERVER['HTTP_REFERER']) ? $_SERVER['HTTP_REFERER'] : '';
         
-        // Analiză euristică bot din User-Agent
-        $isBot = preg_match('/bot|crawl|slurp|spider|mediapartners|headless/i', $userAgent) ? 1 : 0;
-
-        // Determinare scor de fraudă inițial
-        $fraudScore = 0;
-        if ($isBot) $fraudScore += 60;
-        if (empty($referrer) && !empty($gclid)) $fraudScore += 20; // Reclamele din Google au de obicei un referrer valid
-
-        // Verificăm istoricul din baza de date pentru acest IP în fereastra de timp selectată
+        $isBot = preg_match('/bot|crawl|slurp|spider|mediapartners|headless|curl|wget/i', $userAgent) ? 1 : 0;
         $timeWindow = (int)Configuration::get('ADVCLICKFRAUD_TIME_WINDOW');
         $dateThreshold = date('Y-m-d H:i:s', time() - $timeWindow);
 
-        $existingLog = $db->getRow(
-            'SELECT * FROM `' . _DB_PREFIX_ . 'adv_click_fraud_logs` 
-             WHERE `ip_address` = "' . pSQL($ip) . '" 
-             AND `date_add` >= "' . pSQL($dateThreshold) . '"'
-        );
+        $existingLog = $db->getRow('SELECT * FROM `' . _DB_PREFIX_ . 'adv_click_fraud_logs` WHERE `ip_address` = "' . pSQL($ip) . '" AND `date_add` >= "' . pSQL($dateThreshold) . '"');
+        $existingSession = $db->getRow('SELECT * FROM `' . _DB_PREFIX_ . 'adv_click_fraud_sessions` WHERE `ip_address` = "' . pSQL($ip) . '"');
+
+        $fraudScore = $isBot ? 75 : 0;
+        $isScraper = 0;
+
+        // LOGICĂ DETECȚIE SCRAPERI DE PREȚURI
+        if ($is_product_page) {
+            // Numărăm câte pagini de produs a accesat acest IP în ultima oră
+            if ($existingSession) {
+                $visitedPages = json_decode($existingSession['pages_visited'], true);
+                $productPagesCount = is_array($visitedPages) ? count($visitedPages) : 0;
+                $scrapeLimit = (int)Configuration::get('ADVCLICKFRAUD_SCRAPE_LIMIT');
+
+                if ($productPagesCount > $scrapeLimit) {
+                    $isScraper = 1;
+                    $fraudScore = max($fraudScore, 90); // Scraperii agresivi primesc direct scor penalizator mare
+                }
+            }
+        }
 
         if ($existingLog) {
-            $newClickCount = (int)$existingLog['click_count'] + 1;
+            $newClickCount = (int)$existingLog['click_count'] + ($is_ad_click ? 1 : 0);
             $limit = (int)Configuration::get('ADVCLICKFRAUD_CLICK_LIMIT');
             
-            // Creștem exponențial scorul de fraudă pe măsură ce limitele sunt încălcate
-            $extraScore = ($newClickCount > $limit) ? 40 : 15;
+            $extraScore = ($newClickCount > $limit) ? 40 : 10;
+
+            // Verificare istoric telemetrie bazat pe constantele din UI
+            if ($existingSession && (int)$existingSession['mouse_movements'] == 0 && (int)$existingSession['duration'] <= (int)Configuration::get('ADVCLICKFRAUD_MIN_DURATION')) {
+                $extraScore += 30; 
+            }
+
             $finalScore = min(100, (int)$existingLog['fraud_score'] + $extraScore);
+            if ($isScraper) {
+                $finalScore = 100;
+            }
 
             $db->update('adv_click_fraud_logs', [
                 'click_count' => $newClickCount,
                 'fraud_score' => $finalScore,
+                'is_scraper' => (int)($existingLog['is_scraper'] || $isScraper),
                 'date_upd' => date('Y-m-d H:i:s')
             ], 'id_log = ' . (int)$existingLog['id_log']);
         } else {
-            $db->insert('adv_click_fraud_logs', [
-                'ip_address' => pSQL($ip),
-                'gclid' => pSQL($gclid),
-                'utm_source' => pSQL($utm_source),
-                'user_agent' => pSQL($userAgent),
-                'referrer' => pSQL($referrer),
-                'is_bot' => (int)$isBot,
-                'fraud_score' => (int)$fraudScore,
-                'date_add' => date('Y-m-d H:i:s'),
-                'date_upd' => date('Y-m-d H:i:s')
-            ]);
+            if ($is_ad_click) {
+                $db->insert('adv_click_fraud_logs', [
+                    'ip_address' => pSQL($ip),
+                    'gclid' => pSQL($gclid),
+                    'utm_source' => $utm_source ? pSQL($utm_source) : 'google_ads',
+                    'user_agent' => pSQL($userAgent),
+                    'referrer' => pSQL($referrer),
+                    'is_bot' => (int)$isBot,
+                    'is_scraper' => (int)$isScraper,
+                    'fraud_score' => (int)$fraudScore,
+                    'date_add' => date('Y-m-d H:i:s'),
+                    'date_upd' => date('Y-m-d H:i:s')
+                ]);
+            } elseif ($isScraper) {
+                // Înregistrăm scraperul chiar dacă nu a venit din reclame
+                $db->insert('adv_click_fraud_logs', [
+                    'ip_address' => pSQL($ip),
+                    'user_agent' => pSQL($userAgent),
+                    'is_scraper' => 1,
+                    'fraud_score' => 100,
+                    'date_add' => date('Y-m-d H:i:s'),
+                    'date_upd' => date('Y-m-d H:i:s')
+                ]);
+            }
         }
     }
 
@@ -93,10 +126,24 @@ class ClickFraudLog extends ObjectModel
             ]);
         }
 
-        // Ajustăm dinamic scorul de fraudă general bazat pe lipsa de interacțiune umană (Headless Browsers / Boți rapizi)
-        if ($duration > 5 && $mouseMoves == 0 && $keyPresses == 0) {
-            $db->execute('UPDATE `' . _DB_PREFIX_ . 'adv_click_fraud_logs` SET `fraud_score` = LEAST(100, `fraud_score` + 35) WHERE `ip_address` = "' . pSQL($ip) . '"');
+        // EVALUARE INACTIVITATE DIN CONSTANTE DINAMICE UI
+        $minD = (int)Configuration::get('ADVCLICKFRAUD_MIN_DURATION');
+        $maxD = (int)Configuration::get('ADVCLICKFRAUD_MAX_DURATION');
+
+        if ($duration > $minD && $duration < $maxD && $mouseMoves == 0 && $keyPresses == 0) {
+            $db->execute('UPDATE `' . _DB_PREFIX_ . 'adv_click_fraud_logs` SET `fraud_score` = LEAST(100, `fraud_score` + 25) WHERE `ip_address` = "' . pSQL($ip) . '"');
         }
+    }
+
+    public static function cleanOldLogs()
+    {
+        $days = (int)Configuration::get('ADVCLICKFRAUD_RETENTION_DAYS');
+        if ($days <= 0) $days = 30;
+        
+        $dateLimit = date('Y-m-d H:i:s', strtotime("-$days days"));
+        
+        Db::getInstance()->execute('DELETE FROM `' . _DB_PREFIX_ . 'adv_click_fraud_logs` WHERE `date_upd` < "' . pSQL($dateLimit) . '"');
+        Db::getInstance()->execute('DELETE FROM `' . _DB_PREFIX_ . 'adv_click_fraud_sessions` WHERE `date_upd` < "' . pSQL($dateLimit) . '"');
     }
 
     public static function getAllLogs($limit = 50)
@@ -116,7 +163,7 @@ class ClickFraudLog extends ObjectModel
             'total_clicks' => (int)$db->getValue('SELECT SUM(click_count) FROM `' . _DB_PREFIX_ . 'adv_click_fraud_logs`'),
             'total_fraud' => (int)$db->getValue('SELECT COUNT(*) FROM `' . _DB_PREFIX_ . 'adv_click_fraud_logs` WHERE `fraud_score` >= 70'),
             'avg_duration' => (int)$db->getValue('SELECT AVG(duration) FROM `' . _DB_PREFIX_ . 'adv_click_fraud_sessions`'),
-            'bot_count' => (int)$db->getValue('SELECT COUNT(*) FROM `' . _DB_PREFIX_ . 'adv_click_fraud_logs` WHERE `is_bot` = 1')
+            'bot_count' => (int)$db->getValue('SELECT COUNT(*) FROM `' . _DB_PREFIX_ . 'adv_click_fraud_logs` WHERE `is_bot` = 1 OR `is_scraper` = 1')
         ];
     }
 }
