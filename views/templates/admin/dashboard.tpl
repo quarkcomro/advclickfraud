@@ -88,33 +88,53 @@
                 {if $logs}
                     {foreach from=$logs item=log}
                         <tr>
+                            <!-- 1. Adresă IP -->
                             <td><strong>{$log.ip_address|escape:'html':'UTF-8'}</strong></td>
-                            <td><span class="label label-info">{if $log.utm_source}{$log.utm_source|escape:'html':'UTF-8'}{else}Direct/Scraper{/if}</span></td>
+                            
+                            <!-- 2. Campanie -->
+                            <td><span class="label label-info">{if $log.utm_source}{$log.utm_source|escape:'html':'UTF-8'}{else}Direct/Organic{/if}</span></td>
+                            
+                            <!-- 3. Click-uri Ads -->
                             <td><span class="badge">{$log.click_count|intval}</span></td>
+                            
+                            <!-- 4. Pagini vizitate / oră -->
+                            <td><span class="badge badge-warning" style="background-color: #f0ad4e;">{$log.total_pages_visited|intval} pagini</span></td>
+                            
+                            <!-- 5. Timp site -->
                             <td>{$log.duration|intval}s</td>
+                            
+                            <!-- 6. Interacțiune Mouse -->
                             <td>{$log.mouse_movements|intval} M | {$log.key_presses|intval} K</td>
+                            
+                            <!-- 7. Rezoluție -->
                             <td>{$log.screen_resolution|escape:'html':'UTF-8'}</td>
+                            
+                            <!-- 8. Scor Fraudă -->
                             <td>
                                 <div class="progress" style="margin-bottom:0;">
-                                    <div class="progress-bar {if $log.fraud_score >= 70}progress-bar-danger{elseif $log.fraud_score >= 40}progress-bar-warning{else}progress-bar-success{/if}" style="width: {$log.fraud_score|intval}%;">{$log.fraud_score|intval}%</div>
+                                    <div class="progress-bar {if $log.fraud_score >= 70}progress-bar-danger{elif $log.fraud_score >= 40}progress-bar-warning{else}progress-bar-success{/if}" style="width: {$log.fraud_score|intval}%;">{$log.fraud_score|intval}%</div>
                                 </div>
                             </td>
+                            
+                            <!-- 9. Tip Risc -->
                             <td>
                                 {if $log.is_scraper}
                                     <span class="label label-danger">Scraper Prețuri Blochează</span>
-                                {elseif $log.fraud_score >= 70}
+                                {elif $log.fraud_score >= 70}
                                     <span class="label label-danger">Fraudă Critică</span>
-                                {elseif $log.is_bot}
+                                {elif $log.is_bot}
                                     <span class="label label-warning">Bot Automatizat</span>
                                 {else}
                                     <span class="label label-success">Utilizator Legitim</span>
                                 {/if}
                             </td>
+                            
+                            <!-- 10. Ultima vizită -->
                             <td>{$log.date_upd|escape:'html':'UTF-8'}</td>
                         </tr>
                     {/foreach}
                 {else}
-                    <tr><td colspan="9" class="text-center">Nu s-au detectat amenințări.</td></tr>
+                    <tr><td colspan="10" class="text-center">Nu s-au detectat amenințări.</td></tr>
                 {/if}
             </tbody>
         </table>
