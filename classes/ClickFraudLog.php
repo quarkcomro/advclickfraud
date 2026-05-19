@@ -146,14 +146,35 @@ class ClickFraudLog extends ObjectModel
         Db::getInstance()->execute('DELETE FROM `' . _DB_PREFIX_ . 'adv_click_fraud_sessions` WHERE `date_upd` < "' . pSQL($dateLimit) . '"');
     }
 
-    public static function getAllLogs($limit = 50)
+    public static function getAllLogs($limit = 50, $offset = 0, $orderBy = 'date_upd', $orderWay = 'DESC')
     {
-        return Db::getInstance()->executeS('
-            SELECT l.*, s.duration, s.mouse_movements, s.key_presses, s.screen_resolution 
+        // Validăm coloanele permise pentru a preveni SQL Injection
+        $allowedColumns = [
+            'ip_address', 'utm_source', 'click_count', 'total_pages_visited', 
+            'duration', 'mouse_movements', 'key_presses', 'fraud_score', 'date_upd'
+        ];
+        
+        if (!in_array($orderBy, $allowedColumns)) {
+            $orderBy = 'date_upd';
+        }
+        
+        $orderWay = (strtoupper($orderWay) === 'ASC') ? 'ASC' : 'DESC';
+    
+        // Folosim o subinterogare pentru total_pages_visited pentru a putea sorta eficient după ea
+        $sql = '
+            SELECT l.*, s.duration, s.mouse_movements, s.key_presses, s.screen_resolution,
+                   IFNULL(JSON_LENGTH(s.pages_visited), 0) as total_pages_visited
             FROM `' . _DB_PREFIX_ . 'adv_click_fraud_logs` l
             LEFT JOIN `' . _DB_PREFIX_ . 'adv_click_fraud_sessions` s ON l.ip_address = s.ip_address
-            ORDER BY l.date_upd DESC LIMIT ' . (int)$limit
-        );
+            ORDER BY ' . bSQL($orderBy) . ' ' . pSQL($orderWay) . '
+            LIMIT ' . (int)$limit . ' OFFSET ' . (int)$offset;
+    
+        return Db::getInstance()->executeS($sql);
+    }
+
+    public static function getTotalLogsCount()
+    {
+        return (int)Db::getInstance()->getValue('SELECT COUNT(*) FROM `' . _DB_PREFIX_ . 'adv_click_fraud_logs`');
     }
 
     public static function getGlobalStats()
