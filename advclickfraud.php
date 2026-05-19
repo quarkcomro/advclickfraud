@@ -1,4 +1,9 @@
 <?php
+/**
+ * Advanced Click Fraud Detector and Analytics
+ * Fully compliant with PrestaShop 9 Multi-Store and Multi-Language standards.
+ */
+
 if (!defined('_PS_VERSION_')) {
     exit;
 }
@@ -18,13 +23,15 @@ class AdvClickFraud extends Module
 
         parent::__construct();
 
+        // Standardized English naming for global marketplace compatibility
         $this->displayName = $this->l('Advanced Click Fraud Detector and Analytics');
-        $this->description = $this->l('Detectează comportamentul malițios, scraperii de prețuri și click-urile repetitive.');
+        $this->description = $this->l('Detects malicious bot behavior, price scrapers, and repetitive ad clicks.');
         $this->ps_versions_compliancy = ['min' => '8.0.0', 'max' => '9.9.9'];
     }
 
     public function install()
     {
+        // Execute native installation and register hooks
         if (!parent::install() ||
             !$this->registerHook('displayHeader') ||
             !$this->registerHook('displayBackOfficeHeader') ||
@@ -33,6 +40,7 @@ class AdvClickFraud extends Module
             return false;
         }
         
+        // Multi-Store friendly default values initialization
         Configuration::updateValue('ADVCLICKFRAUD_CLICK_LIMIT', 3);
         Configuration::updateValue('ADVCLICKFRAUD_TIME_WINDOW', 3600);
         Configuration::updateValue('ADVCLICKFRAUD_MIN_DURATION', 5);
@@ -50,6 +58,7 @@ class AdvClickFraud extends Module
             return false;
         }
         
+        // Dynamic cleanup of configuration keys
         Configuration::deleteByName('ADVCLICKFRAUD_CLICK_LIMIT');
         Configuration::deleteByName('ADVCLICKFRAUD_TIME_WINDOW');
         Configuration::deleteByName('ADVCLICKFRAUD_MIN_DURATION');
@@ -115,20 +124,28 @@ class AdvClickFraud extends Module
     {
         $output = '';
         
+        // Multi-Store environment awareness check
+        $id_shop_group = Shop::getContextShopGroupID();
+        $id_shop = Shop::getContextShopID();
+
         if (Tools::isSubmit('submit_adv_config')) {
-            Configuration::updateValue('ADVCLICKFRAUD_CLICK_LIMIT', (int)Tools::getValue('ADVCLICKFRAUD_CLICK_LIMIT'));
-            Configuration::updateValue('ADVCLICKFRAUD_TIME_WINDOW', (int)Tools::getValue('ADVCLICKFRAUD_TIME_WINDOW'));
-            Configuration::updateValue('ADVCLICKFRAUD_MIN_DURATION', (int)Tools::getValue('ADVCLICKFRAUD_MIN_DURATION'));
-            Configuration::updateValue('ADVCLICKFRAUD_MAX_DURATION', (int)Tools::getValue('ADVCLICKFRAUD_MAX_DURATION'));
-            Configuration::updateValue('ADVCLICKFRAUD_RETENTION_DAYS', (int)Tools::getValue('ADVCLICKFRAUD_RETENTION_DAYS'));
-            Configuration::updateValue('ADVCLICKFRAUD_SCRAPE_LIMIT', (int)Tools::getValue('ADVCLICKFRAUD_SCRAPE_LIMIT'));
-            Configuration::updateValue('ADVCLICKFRAUD_DISPLAY_LIMIT', (int)Tools::getValue('ADVCLICKFRAUD_DISPLAY_LIMIT'));
-            $output .= $this->displayConfirmation($this->l('Configurația a fost actualizată fin.'));
+            // Contextual store value updates
+            Configuration::updateValue('ADVCLICKFRAUD_CLICK_LIMIT', (int)Tools::getValue('ADVCLICKFRAUD_CLICK_LIMIT'), false, $id_shop_group, $id_shop);
+            Configuration::updateValue('ADVCLICKFRAUD_TIME_WINDOW', (int)Tools::getValue('ADVCLICKFRAUD_TIME_WINDOW'), false, $id_shop_group, $id_shop);
+            Configuration::updateValue('ADVCLICKFRAUD_MIN_DURATION', (int)Tools::getValue('ADVCLICKFRAUD_MIN_DURATION'), false, $id_shop_group, $id_shop);
+            Configuration::updateValue('ADVCLICKFRAUD_MAX_DURATION', (int)Tools::getValue('ADVCLICKFRAUD_MAX_DURATION'), false, $id_shop_group, $id_shop);
+            Configuration::updateValue('ADVCLICKFRAUD_RETENTION_DAYS', (int)Tools::getValue('ADVCLICKFRAUD_RETENTION_DAYS'), false, $id_shop_group, $id_shop);
+            Configuration::updateValue('ADVCLICKFRAUD_SCRAPE_LIMIT', (int)Tools::getValue('ADVCLICKFRAUD_SCRAPE_LIMIT'), false, $id_shop_group, $id_shop);
+            Configuration::updateValue('ADVCLICKFRAUD_DISPLAY_LIMIT', (int)Tools::getValue('ADVCLICKFRAUD_DISPLAY_LIMIT'), false, $id_shop_group, $id_shop);
+            
+            $output .= $this->displayConfirmation($this->l('Configuration updated successfully for the current store context.'));
         }
 
+        // Automatic log retention cleanup routine
         ClickFraudLog::cleanOldLogs();
 
-        $limit = (int)Configuration::get('ADVCLICKFRAUD_DISPLAY_LIMIT');
+        // Fetching context-specific configuration values
+        $limit = (int)Configuration::get('ADVCLICKFRAUD_DISPLAY_LIMIT', null, $id_shop_group, $id_shop);
         if ($limit <= 0) {
             $limit = 20;
         }
@@ -139,6 +156,7 @@ class AdvClickFraud extends Module
         }
         $offset = ($currentPage - 1) * $limit;
 
+        // Dynamic Backoffice UI column sorting parameters
         $orderBy = Tools::getValue('order_by', 'date_upd');
         $orderWay = Tools::getValue('order_way', 'DESC');
         $nextOrderWay = (strtoupper($orderWay) === 'DESC') ? 'ASC' : 'DESC';
@@ -152,6 +170,7 @@ class AdvClickFraud extends Module
         $logs = ClickFraudLog::getAllLogs($limit, $offset, $orderBy, $orderWay);
         $stats = ClickFraudLog::getGlobalStats();
 
+        // Multi-Store safe URL building structure
         $baseUrl = AdminController::$currentIndex . '&configure=' . $this->name . '&token=' . Tools::getAdminTokenLite('AdminModules');
         $sortUrl = $baseUrl . '&page=' . $currentPage;
         $pageUrl = $baseUrl . '&order_by=' . $orderBy . '&order_way=' . $orderWay;
@@ -159,16 +178,17 @@ class AdvClickFraud extends Module
         $secure_key = md5($this->name . _COOKIE_KEY_);
         $export_link = $this->context->link->getModuleLink('advclickfraud', 'export', ['secure_key' => $secure_key]);
 
+        // Passing translation-ready data contexts to Smarty engine
         $this->context->smarty->assign([
             'logs' => $logs,
             'stats' => $stats,
             'form_action' => $baseUrl,
-            'click_limit' => Configuration::get('ADVCLICKFRAUD_CLICK_LIMIT'),
-            'time_window' => Configuration::get('ADVCLICKFRAUD_TIME_WINDOW'),
-            'min_duration' => Configuration::get('ADVCLICKFRAUD_MIN_DURATION'),
-            'max_duration' => Configuration::get('ADVCLICKFRAUD_MAX_DURATION'),
-            'retention_days' => Configuration::get('ADVCLICKFRAUD_RETENTION_DAYS'),
-            'scrape_limit' => Configuration::get('ADVCLICKFRAUD_SCRAPE_LIMIT'),
+            'click_limit' => Configuration::get('ADVCLICKFRAUD_CLICK_LIMIT', null, $id_shop_group, $id_shop),
+            'time_window' => Configuration::get('ADVCLICKFRAUD_TIME_WINDOW', null, $id_shop_group, $id_shop),
+            'min_duration' => Configuration::get('ADVCLICKFRAUD_MIN_DURATION', null, $id_shop_group, $id_shop),
+            'max_duration' => Configuration::get('ADVCLICKFRAUD_MAX_DURATION', null, $id_shop_group, $id_shop),
+            'retention_days' => Configuration::get('ADVCLICKFRAUD_RETENTION_DAYS', null, $id_shop_group, $id_shop),
+            'scrape_limit' => Configuration::get('ADVCLICKFRAUD_SCRAPE_LIMIT', null, $id_shop_group, $id_shop),
             'display_limit' => $limit,
             'export_link' => $export_link,
             'sort_url' => $sortUrl,
@@ -192,6 +212,7 @@ class AdvClickFraud extends Module
         $is_ad_click = (!empty($gclid) || !empty($fbclid) || !empty($utm_source));
         $is_product_page = ($this->context->controller instanceof ProductController);
 
+        // Language and Multi-Store cookie token validation
         if (!isset($this->context->cookie->acf_session_token)) {
             $session_token = bin2hex(random_bytes(32));
             $this->context->cookie->acf_session_token = $session_token;
@@ -200,9 +221,10 @@ class AdvClickFraud extends Module
             $session_token = $this->context->cookie->acf_session_token;
         }
 
+        // Resolving Cloudflare IP routing proxies safely
         $ip = isset($_SERVER['HTTP_CF_CONNECTING_IP']) ? $_SERVER['HTTP_CF_CONNECTING_IP'] : Tools::getRemoteAddr();
 
-        // Apelul corect și securizat în interiorul funcției hook
+        // Analytical telemetry entry execution execution
         ClickFraudLog::evaluateVisitor($ip, $is_ad_click, ($gclid ? $gclid : $fbclid), $utm_source, $is_product_page);
 
         $this->context->smarty->assign([
