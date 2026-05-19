@@ -40,6 +40,7 @@ class AdvClickFraud extends Module
         Configuration::updateValue('ADVCLICKFRAUD_MAX_DURATION', 30);
         Configuration::updateValue('ADVCLICKFRAUD_RETENTION_DAYS', 30);
         Configuration::updateValue('ADVCLICKFRAUD_SCRAPE_LIMIT', 15); // Max pagini produs / minut
+        Configuration::updateValue('ADVCLICKFRAUD_DISPLAY_LIMIT', 20); // Număr implicit de rânduri pe pagină
         
         return true;
     }
@@ -56,6 +57,7 @@ class AdvClickFraud extends Module
         Configuration::deleteByName('ADVCLICKFRAUD_MAX_DURATION');
         Configuration::deleteByName('ADVCLICKFRAUD_RETENTION_DAYS');
         Configuration::deleteByName('ADVCLICKFRAUD_SCRAPE_LIMIT');
+        Configuration::deleteByName('ADVCLICKFRAUD_DISPLAY_LIMIT');
         
         return true;
     }
@@ -114,6 +116,7 @@ class AdvClickFraud extends Module
     {
         $output = '';
         
+        // Procesare salvare formular
         if (Tools::isSubmit('submit_adv_config')) {
             Configuration::updateValue('ADVCLICKFRAUD_CLICK_LIMIT', (int)Tools::getValue('ADVCLICKFRAUD_CLICK_LIMIT'));
             Configuration::updateValue('ADVCLICKFRAUD_TIME_WINDOW', (int)Tools::getValue('ADVCLICKFRAUD_TIME_WINDOW'));
@@ -121,30 +124,69 @@ class AdvClickFraud extends Module
             Configuration::updateValue('ADVCLICKFRAUD_MAX_DURATION', (int)Tools::getValue('ADVCLICKFRAUD_MAX_DURATION'));
             Configuration::updateValue('ADVCLICKFRAUD_RETENTION_DAYS', (int)Tools::getValue('ADVCLICKFRAUD_RETENTION_DAYS'));
             Configuration::updateValue('ADVCLICKFRAUD_SCRAPE_LIMIT', (int)Tools::getValue('ADVCLICKFRAUD_SCRAPE_LIMIT'));
+            Configuration::updateValue('ADVCLICKFRAUD_DISPLAY_LIMIT', (int)Tools::getValue('ADVCLICKFRAUD_DISPLAY_LIMIT'));
             $output .= $this->displayConfirmation($this->l('Configurația a fost actualizată fin.'));
         }
-
-        // Curățare automată a logurilor vechi la deschiderea panoului
+    
         ClickFraudLog::cleanOldLogs();
-
+    
+        // Gestionare Paginație
+        $limit = (int)Configuration::get('ADVCLICKFRAUD_DISPLAY_LIMIT');
+        if ($limit <= 0) $limit = 20;
+        
+        $currentPage = (int)Tools::getValue('page', 1);
+        if ($currentPage < 1) $currentPage = 1;
+        $offset = ($currentPage - 1) * $limit;
+    
+        // Gestionare Sortare dinamică
+        $orderBy = Tools::getValue('order_by', 'date_upd');
+        $orderWay = Tools::getValue('order_way', 'DESC');
+        
+        // Inversare direcție pentru link-uri clickabile
+        $nextOrderWay = (strtoupper($orderWay) === 'DESC') ? 'ASC' : 'DESC';
+    
+        // Preluare date din model
+        $totalLogs = ClickFraudLog::getTotalLogsCount();
+        $totalPages = ceil($totalLogs / $limit);
+        if ($totalPages < 1) $totalPages = 1;
+    
+        $logs = ClickFraudLog::getAllLogs($limit, $offset, $orderBy, $orderWay);
+        $stats = ClickFraudLog::getGlobalStats();
+    
+        // Link-uri de bază securizate
+        $baseUrl = AdminController::$currentIndex . '&configure=' . $this->name . '&token=' . Tools::getAdminTokenLite('AdminModules');
+        $sortUrl = $baseUrl . '&page=' . $currentPage;
+        $pageUrl = $baseUrl . '&order_by=' . $orderBy . '&order_way=' . $orderWay;
+    
         $secure_key = md5($this->name . _COOKIE_KEY_);
         $export_link = $this->context->link->getModuleLink('advclickfraud', 'export', ['secure_key' => $secure_key]);
-
+    
         $this->context->smarty->assign([
-            'logs' => ClickFraudLog::getAllLogs(50),
-            'stats' => ClickFraudLog::getGlobalStats(),
-            'form_action' => AdminController::$currentIndex . '&configure=' . $this->name . '&token=' . Tools::getAdminTokenLite('AdminModules'),
+            'logs' => $logs,
+            'stats' => $stats,
+            'form_action' => $baseUrl,
             'click_limit' => Configuration::get('ADVCLICKFRAUD_CLICK_LIMIT'),
             'time_window' => Configuration::get('ADVCLICKFRAUD_TIME_WINDOW'),
             'min_duration' => Configuration::get('ADVCLICKFRAUD_MIN_DURATION'),
             'max_duration' => Configuration::get('ADVCLICKFRAUD_MAX_DURATION'),
             'retention_days' => Configuration::get('ADVCLICKFRAUD_RETENTION_DAYS'),
             'scrape_limit' => Configuration::get('ADVCLICKFRAUD_SCRAPE_LIMIT'),
-            'export_link' => $export_link
+            'display_limit' => $limit,
+            'export_link' => $export_link,
+            
+            // Variabile noi pentru UI de sortare și paginație
+            'sort_url' => $sortUrl,
+            'page_url' => $pageUrl,
+            'current_page' => $currentPage,
+            'total_pages' => $totalPages,
+            'order_by' => $orderBy,
+            'order_way' => $orderWay,
+            'next_order_way' => $nextOrderWay
         ]);
-
+    
         return $output . $this->context->smarty->fetch($this->local_path . 'views/templates/admin/dashboard.tpl');
     }
+
 
     public function hookDisplayHeader()
     {
