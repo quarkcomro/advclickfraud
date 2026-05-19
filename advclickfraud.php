@@ -11,7 +11,7 @@ class AdvClickFraud extends Module
     {
         $this->name = 'advclickfraud';
         $this->tab = 'analytics_stats';
-        $this->version = '1.0.0';
+        $this->version = '1.2.0';
         $this->author = 'Expert Developer';
         $this->need_instance = 1;
         $this->bootstrap = true;
@@ -19,7 +19,7 @@ class AdvClickFraud extends Module
         parent::__construct();
 
         $this->displayName = $this->l('Advanced Click Fraud Detector and Analytics');
-        $this->description = $this->l('Detectează comportamentul malițios, boții și click-urile repetitive din reclame.');
+        $this->description = $this->l('Detectează comportamentul malițios, scraperii de prețuri și click-urile repetitive.');
         $this->ps_versions_compliancy = ['min' => '8.0.0', 'max' => '9.9.9'];
     }
 
@@ -33,8 +33,13 @@ class AdvClickFraud extends Module
             return false;
         }
         
-        Configuration::updateValue('ADVCLICKFRAUD_CLICK_LIMIT', 3); // Max click-uri permise per IP
-        Configuration::updateValue('ADVCLICKFRAUD_TIME_WINDOW', 3600); // Fereastra de timp în secunde (1 oră)
+        // Salvare valori implicite în baza de date (Fără hardcodare)
+        Configuration::updateValue('ADVCLICKFRAUD_CLICK_LIMIT', 3);
+        Configuration::updateValue('ADVCLICKFRAUD_TIME_WINDOW', 3600);
+        Configuration::updateValue('ADVCLICKFRAUD_MIN_DURATION', 5);
+        Configuration::updateValue('ADVCLICKFRAUD_MAX_DURATION', 30);
+        Configuration::updateValue('ADVCLICKFRAUD_RETENTION_DAYS', 30);
+        Configuration::updateValue('ADVCLICKFRAUD_SCRAPE_LIMIT', 15); // Max pagini produs / minut
         
         return true;
     }
@@ -47,6 +52,10 @@ class AdvClickFraud extends Module
         
         Configuration::deleteByName('ADVCLICKFRAUD_CLICK_LIMIT');
         Configuration::deleteByName('ADVCLICKFRAUD_TIME_WINDOW');
+        Configuration::deleteByName('ADVCLICKFRAUD_MIN_DURATION');
+        Configuration::deleteByName('ADVCLICKFRAUD_MAX_DURATION');
+        Configuration::deleteByName('ADVCLICKFRAUD_RETENTION_DAYS');
+        Configuration::deleteByName('ADVCLICKFRAUD_SCRAPE_LIMIT');
         
         return true;
     }
@@ -61,16 +70,14 @@ class AdvClickFraud extends Module
                 `utm_source` VARCHAR(100) NULL,
                 `user_agent` TEXT NOT NULL,
                 `referrer` TEXT NULL,
-                `country` VARCHAR(3) NULL,
                 `click_count` INT UNSIGNED DEFAULT 1,
                 `is_bot` TINYINT(1) DEFAULT 0,
-                `is_vpn` TINYINT(1) DEFAULT 0,
+                `is_scraper` TINYINT(1) DEFAULT 0,
                 `fraud_score` INT UNSIGNED DEFAULT 0,
                 `date_add` DATETIME NOT NULL,
                 `date_upd` DATETIME NOT NULL,
                 PRIMARY KEY (`id_log`),
-                INDEX `idx_ip` (`ip_address`),
-                INDEX `idx_gclid` (`gclid`)
+                INDEX `idx_ip` (`ip_address`)
             ) ENGINE=" . _MYSQL_ENGINE_ . " DEFAULT CHARSET=utf8mb4;",
 
             "CREATE TABLE IF NOT EXISTS `" . _DB_PREFIX_ . "adv_click_fraud_sessions` (
@@ -110,60 +117,55 @@ class AdvClickFraud extends Module
         if (Tools::isSubmit('submit_adv_config')) {
             Configuration::updateValue('ADVCLICKFRAUD_CLICK_LIMIT', (int)Tools::getValue('ADVCLICKFRAUD_CLICK_LIMIT'));
             Configuration::updateValue('ADVCLICKFRAUD_TIME_WINDOW', (int)Tools::getValue('ADVCLICKFRAUD_TIME_WINDOW'));
-            $output .= $this->displayConfirmation($this->l('Setările au fost salvate cu succes.'));
+            Configuration::updateValue('ADVCLICKFRAUD_MIN_DURATION', (int)Tools::getValue('ADVCLICKFRAUD_MIN_DURATION'));
+            Configuration::updateValue('ADVCLICKFRAUD_MAX_DURATION', (int)Tools::getValue('ADVCLICKFRAUD_MAX_DURATION'));
+            Configuration::updateValue('ADVCLICKFRAUD_RETENTION_DAYS', (int)Tools::getValue('ADVCLICKFRAUD_RETENTION_DAYS'));
+            Configuration::updateValue('ADVCLICKFRAUD_SCRAPE_LIMIT', (int)Tools::getValue('ADVCLICKFRAUD_SCRAPE_LIMIT'));
+            $output .= $this->displayConfirmation($this->l('Configurația a fost actualizată fin.'));
         }
 
-        $this->context->smarty->assign([
-            'logs' => ClickFraudLog::getAllLogs(50),
-            'stats' => ClickFraudLog::getGlobalStats(),
-            'form_action' => AdminController::$currentIndex . '&configure=' . $this->name . '&token=' . Tools::getAdminTokenLite('AdminModules'),
-            'click_limit' => Configuration::get('ADVCLICKFRAUD_CLICK_LIMIT'),
-            'time_window' => Configuration::get('ADVCLICKFRAUD_TIME_WINDOW')
-        ]);
+        // Curățare automată a logurilor vechi la deschiderea panoului
+        ClickFraudLog::cleanOldLogs();
 
-        // Afișarea URL-ului de Export în Dashboard
         $secure_key = md5($this->name . _COOKIE_KEY_);
         $export_link = $this->context->link->getModuleLink('advclickfraud', 'export', ['secure_key' => $secure_key]);
-        
+
         $this->context->smarty->assign([
             'logs' => ClickFraudLog::getAllLogs(50),
             'stats' => ClickFraudLog::getGlobalStats(),
             'form_action' => AdminController::$currentIndex . '&configure=' . $this->name . '&token=' . Tools::getAdminTokenLite('AdminModules'),
             'click_limit' => Configuration::get('ADVCLICKFRAUD_CLICK_LIMIT'),
             'time_window' => Configuration::get('ADVCLICKFRAUD_TIME_WINDOW'),
-            'export_link' => $export_link // Trimitem link-ul către interfață
+            'min_duration' => Configuration::get('ADVCLICKFRAUD_MIN_DURATION'),
+            'max_duration' => Configuration::get('ADVCLICKFRAUD_MAX_DURATION'),
+            'retention_days' => Configuration::get('ADVCLICKFRAUD_RETENTION_DAYS'),
+            'scrape_limit' => Configuration::get('ADVCLICKFRAUD_SCRAPE_LIMIT'),
+            'export_link' => $export_link
         ]);
-        
+
         return $output . $this->context->smarty->fetch($this->local_path . 'views/templates/admin/dashboard.tpl');
     }
 
     public function hookDisplayHeader()
     {
-        // Preluăm parametrii de tracking publicitar direct din URL global securizat
         $gclid = Tools::getValue('gclid');
         $fbclid = Tools::getValue('fbclid');
         $utm_source = Tools::getValue('utm_source');
+        $ip = Tools::getRemoteAddr();
 
-        // Verificăm dacă vizita provine dintr-o reclamă plătită
-        $is_ad_click = (!empty($gclid) || !empty($fbclid) || !empty($utm_source) || ($utm_source == 'google'));
+        // Algoritm de detecție Scraperi: Verificăm dacă vizualizează o pagină de produs
+        $is_product_page = ($this->context->controller instanceof ProductController);
 
-        // Generăm un token unic de sesiune pentru securitate AJAX și izolare tracking
         if (!isset($this->context->cookie->acf_session_token)) {
-            $session_token = Bin2hex(random_bytes(32));
+            $session_token = bin2hex(random_bytes(32));
             $this->context->cookie->acf_session_token = $session_token;
             $this->context->cookie->write();
         } else {
             $session_token = $this->context->cookie->acf_session_token;
         }
 
-        // Executăm logica de analiză severă backend la prima încărcare dacă e click din Ads
-        if ($is_ad_click) {
-            ClickFraudLog::logAdClick(
-                Tools::getRemoteAddr(),
-                $gclid ? $gclid : $fbclid,
-                $utm_source ? $utm_source : ($gclid ? 'google_ads' : 'facebook_ads')
-            );
-        }
+        // Rulam logica centralizată (atât pentru Ads cât și pentru monitorizare pagini de produs/Scrapers)
+        ClickFraudLog::evaluateVisitor($ip, $gclid || $fbclid || $utm_source, $gclid, $utm_source, $is_product_page);
 
         $this->context->smarty->assign([
             'acf_ajax_link' => $this->context->link->getModuleLink('advclickfraud', 'track'),
