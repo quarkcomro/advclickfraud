@@ -121,6 +121,19 @@ class AdvClickFraud extends Module
             'time_window' => Configuration::get('ADVCLICKFRAUD_TIME_WINDOW')
         ]);
 
+        // Afișarea URL-ului de Export în Dashboard
+        $secure_key = Tools::encrypt($this->name);
+        $export_link = $this->context->link->getModuleLink('advclickfraud', 'export', ['secure_key' => $secure_key]);
+        
+        $this->context->smarty->assign([
+            'logs' => ClickFraudLog::getAllLogs(50),
+            'stats' => ClickFraudLog::getGlobalStats(),
+            'form_action' => AdminController::$currentIndex . '&configure=' . $this->name . '&token=' . Tools::getAdminTokenLite('AdminModules'),
+            'click_limit' => Configuration::get('ADVCLICKFRAUD_CLICK_LIMIT'),
+            'time_window' => Configuration::get('ADVCLICKFRAUD_TIME_WINDOW'),
+            'export_link' => $export_link // Trimitem link-ul către interfață
+        ]);
+        
         return $output . $this->context->smarty->fetch($this->local_path . 'views/templates/admin/dashboard.tpl');
     }
 
