@@ -33,14 +33,13 @@ class AdvClickFraud extends Module
             return false;
         }
         
-        // Salvare valori implicite în baza de date (Fără hardcodare)
         Configuration::updateValue('ADVCLICKFRAUD_CLICK_LIMIT', 3);
         Configuration::updateValue('ADVCLICKFRAUD_TIME_WINDOW', 3600);
         Configuration::updateValue('ADVCLICKFRAUD_MIN_DURATION', 5);
         Configuration::updateValue('ADVCLICKFRAUD_MAX_DURATION', 30);
         Configuration::updateValue('ADVCLICKFRAUD_RETENTION_DAYS', 30);
-        Configuration::updateValue('ADVCLICKFRAUD_SCRAPE_LIMIT', 15); // Max pagini produs / minut
-        Configuration::updateValue('ADVCLICKFRAUD_DISPLAY_LIMIT', 20); // Număr implicit de rânduri pe pagină
+        Configuration::updateValue('ADVCLICKFRAUD_SCRAPE_LIMIT', 15);
+        Configuration::updateValue('ADVCLICKFRAUD_DISPLAY_LIMIT', 20);
         
         return true;
     }
@@ -116,7 +115,6 @@ class AdvClickFraud extends Module
     {
         $output = '';
         
-        // Procesare salvare formular
         if (Tools::isSubmit('submit_adv_config')) {
             Configuration::updateValue('ADVCLICKFRAUD_CLICK_LIMIT', (int)Tools::getValue('ADVCLICKFRAUD_CLICK_LIMIT'));
             Configuration::updateValue('ADVCLICKFRAUD_TIME_WINDOW', (int)Tools::getValue('ADVCLICKFRAUD_TIME_WINDOW'));
@@ -127,40 +125,40 @@ class AdvClickFraud extends Module
             Configuration::updateValue('ADVCLICKFRAUD_DISPLAY_LIMIT', (int)Tools::getValue('ADVCLICKFRAUD_DISPLAY_LIMIT'));
             $output .= $this->displayConfirmation($this->l('Configurația a fost actualizată fin.'));
         }
-    
+
         ClickFraudLog::cleanOldLogs();
-    
-        // Gestionare Paginație
+
         $limit = (int)Configuration::get('ADVCLICKFRAUD_DISPLAY_LIMIT');
-        if ($limit <= 0) $limit = 20;
+        if ($limit <= 0) {
+            $limit = 20;
+        }
         
         $currentPage = (int)Tools::getValue('page', 1);
-        if ($currentPage < 1) $currentPage = 1;
+        if ($currentPage < 1) {
+            $currentPage = 1;
+        }
         $offset = ($currentPage - 1) * $limit;
-    
-        // Gestionare Sortare dinamică
+
         $orderBy = Tools::getValue('order_by', 'date_upd');
         $orderWay = Tools::getValue('order_way', 'DESC');
-        
-        // Inversare direcție pentru link-uri clickabile
         $nextOrderWay = (strtoupper($orderWay) === 'DESC') ? 'ASC' : 'DESC';
-    
-        // Preluare date din model
+
         $totalLogs = ClickFraudLog::getTotalLogsCount();
         $totalPages = ceil($totalLogs / $limit);
-        if ($totalPages < 1) $totalPages = 1;
-    
+        if ($totalPages < 1) {
+            $totalPages = 1;
+        }
+
         $logs = ClickFraudLog::getAllLogs($limit, $offset, $orderBy, $orderWay);
         $stats = ClickFraudLog::getGlobalStats();
-    
-        // Link-uri de bază securizate
+
         $baseUrl = AdminController::$currentIndex . '&configure=' . $this->name . '&token=' . Tools::getAdminTokenLite('AdminModules');
         $sortUrl = $baseUrl . '&page=' . $currentPage;
         $pageUrl = $baseUrl . '&order_by=' . $orderBy . '&order_way=' . $orderWay;
-    
+
         $secure_key = md5($this->name . _COOKIE_KEY_);
         $export_link = $this->context->link->getModuleLink('advclickfraud', 'export', ['secure_key' => $secure_key]);
-    
+
         $this->context->smarty->assign([
             'logs' => $logs,
             'stats' => $stats,
@@ -173,8 +171,6 @@ class AdvClickFraud extends Module
             'scrape_limit' => Configuration::get('ADVCLICKFRAUD_SCRAPE_LIMIT'),
             'display_limit' => $limit,
             'export_link' => $export_link,
-            
-            // Variabile noi pentru UI de sortare și paginație
             'sort_url' => $sortUrl,
             'page_url' => $pageUrl,
             'current_page' => $currentPage,
@@ -183,25 +179,19 @@ class AdvClickFraud extends Module
             'order_way' => $orderWay,
             'next_order_way' => $nextOrderWay
         ]);
-    
+
         return $output . $this->context->smarty->fetch($this->local_path . 'views/templates/admin/dashboard.tpl');
     }
 
-
     public function hookDisplayHeader()
     {
-        // 1. Preluăm parametrii publicitari (dacă există)
         $gclid = Tools::getValue('gclid');
         $fbclid = Tools::getValue('fbclid');
         $utm_source = Tools::getValue('utm_source');
-    
-        // Determinăm dacă este un click plătit
+
         $is_ad_click = (!empty($gclid) || !empty($fbclid) || !empty($utm_source));
-    
-        // 2. Verificăm dacă vizitatorul se află pe o pagină de produs (ținta scraperilor)
         $is_product_page = ($this->context->controller instanceof ProductController);
-    
-        // 3. Generăm sau menținem token-ul unic de sesiune pentru telemetrie
+
         if (!isset($this->context->cookie->acf_session_token)) {
             $session_token = bin2hex(random_bytes(32));
             $this->context->cookie->acf_session_token = $session_token;
@@ -210,26 +200,10 @@ class AdvClickFraud extends Module
             $session_token = $this->context->cookie->acf_session_token;
         }
 
-    // 4. PRELUARE IP - Soluție compatibilă și cu Cloudflare / Reverse Proxy
-    $ip = isset($_SERVER['HTTP_CF_CONNECTING_IP']) ? $_SERVER['HTTP_CF_CONNECTING_IP'] : Tools::getRemoteAddr();
+        $ip = isset($_SERVER['HTTP_CF_CONNECTING_IP']) ? $_SERVER['HTTP_CF_CONNECTING_IP'] : Tools::getRemoteAddr();
 
-    // MODIFICARE CRITICĂ: Rulăm algoritmul la FIECARE afișare de pagină.
-    // Algoritmul intern va decide singur dacă vizita este un click Ads legitim, un Bot sau un Scraper organic.
-    ClickFraudLog::evaluateVisitor($ip, $is_ad_click, ($gclid ? $gclid : $fbclid), $utm_source, $is_product_page);
-
-    // 5. Trimitem datele către Javascript pentru urmărirea mișcărilor de mouse
-    $this->context->smarty->assign([
-        'acf_ajax_link' => $this->context->link->getModuleLink('advclickfraud', 'track'),
-        'acf_token' => $session_token,
-        'current_page' => Tools::getHttpHost(true) . $_SERVER['REQUEST_URI']
-    ]);
-
-    return $this->display(__FILE__, 'views/templates/hook/header.tpl');
-}
-
-
-        // Rulam logica centralizată (atât pentru Ads cât și pentru monitorizare pagini de produs/Scrapers)
-        ClickFraudLog::evaluateVisitor($ip, $gclid || $fbclid || $utm_source, $gclid, $utm_source, $is_product_page);
+        // Apelul corect și securizat în interiorul funcției hook
+        ClickFraudLog::evaluateVisitor($ip, $is_ad_click, ($gclid ? $gclid : $fbclid), $utm_source, $is_product_page);
 
         $this->context->smarty->assign([
             'acf_ajax_link' => $this->context->link->getModuleLink('advclickfraud', 'track'),
