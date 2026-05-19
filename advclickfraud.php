@@ -215,7 +215,7 @@ class AdvClickFraud extends Module
 
     // MODIFICARE CRITICĂ: Rulăm algoritmul la FIECARE afișare de pagină.
     // Algoritmul intern va decide singur dacă vizita este un click Ads legitim, un Bot sau un Scraper organic.
-    ClickFraudLog::evaluateVisitor($ip, $is_ad_click, $gclid ? $gclid : $fbclid, $utm_source, $is_product_page);
+    ClickFraudLog::evaluateVisitor($ip, $is_ad_click, ($gclid ? $gclid : $fbclid), $utm_source, $is_product_page);
 
     // 5. Trimitem datele către Javascript pentru urmărirea mișcărilor de mouse
     $this->context->smarty->assign([
