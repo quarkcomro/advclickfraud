@@ -1,27 +1,30 @@
 <?php
+/**
+ * Ajax Frontend Tracking Controller
+ * Multistore payload isolation via context shop query validation parameters.
+ */
+
 class AdvClickFraudTrackModuleFrontController extends ModuleFrontController
 {
     public function initContent()
     {
-        // Dezactivăm randarea template-urilor de magazin pentru viteză brută
         $this->ajax = true; 
         parent::initContent();
 
-        // Citim fluxul brut de date JSON asincron (compatibil sendBeacon / Fetch)
         $rawPayload = file_get_contents('php://input');
         $data = json_decode($rawPayload, true);
 
         if (!$data || empty($data['token'])) {
             header('HTTP/1.1 400 Bad Request');
-            exit('Invalide Telemetry Payload');
+            exit('Invalid Payload');
         }
 
         $token = $data['token'];
-        $ip = Tools::getRemoteAddr();
+        $ip = isset($_SERVER['HTTP_CF_CONNECTING_IP']) ? $_SERVER['HTTP_CF_CONNECTING_IP'] : Tools::getRemoteAddr();
+        $id_shop = (int)Tools::getValue('id_shop', $this->context->shop->id);
 
-        // Executăm inserția și parsarea telemetriei în modelul izolat
         require_once _PS_MODULE_DIR_ . 'advclickfraud/classes/ClickFraudLog.php';
-        ClickFraudLog::updateSessionTelemetry($token, $ip, $data);
+        ClickFraudLog::updateSessionTelemetry($token, $ip, $data, $id_shop);
 
         header('Content-Type: application/json');
         echo json_encode(['status' => 'success']);
