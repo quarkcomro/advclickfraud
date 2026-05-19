@@ -18,7 +18,7 @@ class AdvClickFraud extends Module
 
         parent::__construct();
 
-        $this->displayName = $this->l('Advanced Click Fraud Detector & Analytics');
+        $this->displayName = $this->l('Advanced Click Fraud Detector and Analytics');
         $this->description = $this->l('Detectează comportamentul malițios, boții și click-urile repetitive din reclame.');
         $this->ps_versions_compliancy = ['min' => '8.0.0', 'max' => '9.9.9'];
     }
