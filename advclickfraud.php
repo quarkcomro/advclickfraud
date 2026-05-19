@@ -148,14 +148,18 @@ class AdvClickFraud extends Module
 
     public function hookDisplayHeader()
     {
+        // 1. Preluăm parametrii publicitari (dacă există)
         $gclid = Tools::getValue('gclid');
         $fbclid = Tools::getValue('fbclid');
         $utm_source = Tools::getValue('utm_source');
-        $ip = Tools::getRemoteAddr();
-
-        // Algoritm de detecție Scraperi: Verificăm dacă vizualizează o pagină de produs
+    
+        // Determinăm dacă este un click plătit
+        $is_ad_click = (!empty($gclid) || !empty($fbclid) || !empty($utm_source));
+    
+        // 2. Verificăm dacă vizitatorul se află pe o pagină de produs (ținta scraperilor)
         $is_product_page = ($this->context->controller instanceof ProductController);
-
+    
+        // 3. Generăm sau menținem token-ul unic de sesiune pentru telemetrie
         if (!isset($this->context->cookie->acf_session_token)) {
             $session_token = bin2hex(random_bytes(32));
             $this->context->cookie->acf_session_token = $session_token;
@@ -163,6 +167,24 @@ class AdvClickFraud extends Module
         } else {
             $session_token = $this->context->cookie->acf_session_token;
         }
+
+    // 4. PRELUARE IP - Soluție compatibilă și cu Cloudflare / Reverse Proxy
+    $ip = isset($_SERVER['HTTP_CF_CONNECTING_IP']) ? $_SERVER['HTTP_CF_CONNECTING_IP'] : Tools::getRemoteAddr();
+
+    // MODIFICARE CRITICĂ: Rulăm algoritmul la FIECARE afișare de pagină.
+    // Algoritmul intern va decide singur dacă vizita este un click Ads legitim, un Bot sau un Scraper organic.
+    ClickFraudLog::evaluateVisitor($ip, $is_ad_click, $gclid ? $gclid : $fbclid, $utm_source, $is_product_page);
+
+    // 5. Trimitem datele către Javascript pentru urmărirea mișcărilor de mouse
+    $this->context->smarty->assign([
+        'acf_ajax_link' => $this->context->link->getModuleLink('advclickfraud', 'track'),
+        'acf_token' => $session_token,
+        'current_page' => Tools::getHttpHost(true) . $_SERVER['REQUEST_URI']
+    ]);
+
+    return $this->display(__FILE__, 'views/templates/hook/header.tpl');
+}
+
 
         // Rulam logica centralizată (atât pentru Ads cât și pentru monitorizare pagini de produs/Scrapers)
         ClickFraudLog::evaluateVisitor($ip, $gclid || $fbclid || $utm_source, $gclid, $utm_source, $is_product_page);
