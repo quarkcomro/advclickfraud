@@ -122,7 +122,7 @@ class AdvClickFraud extends Module
         ]);
 
         // Afișarea URL-ului de Export în Dashboard
-        $secure_key = Tools::encrypt($this->name);
+        $secure_key = md5($this->name . _COOKIE_KEY_);
         $export_link = $this->context->link->getModuleLink('advclickfraud', 'export', ['secure_key' => $secure_key]);
         
         $this->context->smarty->assign([
