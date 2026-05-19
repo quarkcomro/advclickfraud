@@ -45,6 +45,10 @@
                     <label class="control-label col-lg-4">Păstrare Istoric Bază Date (Zile)</label>
                     <div class="col-lg-8"><input type="number" name="ADVCLICKFRAUD_RETENTION_DAYS" value="{$retention_days|intval}" class="form-control"/></div>
                 </div>
+                <div class="form-group">
+                    <label class="control-label col-lg-4">Rânduri pe pagină în tabel</label>
+                    <div class="col-lg-8"><input type="number" name="ADVCLICKFRAUD_DISPLAY_LIMIT" value="{$display_limit|intval}" class="form-control"/></div>
+                </div>
             </div>
         </div>
         <div class="panel-footer">
@@ -67,17 +71,19 @@
         <table class="table table-bordered">
             <thead>
                 <tr>
-                    <th>Adresă IP</th>
-                    <th>Campanie</th>
-                    <th>Click-uri</th>
-                    <th>Timp site</th>
-                    <th>Interacțiune (M/K)</th>
+                    <th><a href="{$sort_url}&order_by=ip_address&order_way={$next_order_way}">Adresă IP {if $order_by=='ip_address'}{if $order_way=='ASC'}<i class="icon-caret-up"></i>{else}<i class="icon-caret-down"></i>{if}{/if}</a></th>
+                    <th><a href="{$sort_url}&order_by=utm_source&order_way={$next_order_way}">Campanie {if $order_by=='utm_source'}{if $order_way=='ASC'}<i class="icon-caret-up"></i>{else}<i class="icon-caret-down"></i>{if}{/if}</a></th>
+                    <th><a href="{$sort_url}&order_by=click_count&order_way={$next_order_way}">Click-uri Ads {if $order_by=='click_count'}{if $order_way=='ASC'}<i class="icon-caret-up"></i>{else}<i class="icon-caret-down"></i>{if}{/if}</a></th>
+                    <th><a href="{$sort_url}&order_by=total_pages_visited&order_way={$next_order_way}">Pagini vizitate / oră {if $order_by=='total_pages_visited'}{if $order_way=='ASC'}<i class="icon-caret-up"></i>{else}<i class="icon-caret-down"></i>{if}{/if}</a></th>
+                    <th><a href="{$sort_url}&order_by=duration&order_way={$next_order_way}">Timp site {if $order_by=='duration'}{if $order_way=='ASC'}<i class="icon-caret-up"></i>{else}<i class="icon-caret-down"></i>{if}{/if}</a></th>
+                    <th><a href="{$sort_url}&order_by=mouse_movements&order_way={$next_order_way}">Interacțiune Mouse {if $order_by=='mouse_movements'}{if $order_way=='ASC'}<i class="icon-caret-up"></i>{else}<i class="icon-caret-down"></i>{if}{/if}</a></th>
                     <th>Rezoluție</th>
-                    <th>Scor Fraudă</th>
+                    <th><a href="{$sort_url}&order_by=fraud_score&order_way={$next_order_way}">Scor Fraudă {if $order_by=='fraud_score'}{if $order_way=='ASC'}<i class="icon-caret-up"></i>{else}<i class="icon-caret-down"></i>{if}{/if}</a></th>
                     <th>Tip Risc</th>
-                    <th>Ultima vizită</th>
+                    <th><a href="{$sort_url}&order_by=date_upd&order_way={$next_order_way}">Ultima vizită {if $order_by=='date_upd'}{if $order_way=='ASC'}<i class="icon-caret-up"></i>{else}<i class="icon-caret-down"></i>{if}{/if}</a></th>
                 </tr>
             </thead>
+
             <tbody>
                 {if $logs}
                     {foreach from=$logs item=log}
@@ -112,5 +118,33 @@
                 {/if}
             </tbody>
         </table>
+    </div>
+            <!-- SISTEM PAGINAȚIE COMPATIBIL BOOTSTRAP PRESTASHOP -->
+        {if $total_pages > 1}
+            <div class="panel-footer" style="background: #fff; border-top: 1px solid #edf1f2; padding: 15px 0;">
+                <div class="row">
+                    <div class="col-sm-6 text-left" style="line-height: 34px; padding-left: 15px;">
+                        Pagina <strong>{$current_page}</strong> din <strong>{$total_pages}</strong>
+                    </div>
+                    <div class="col-sm-6 text-right" style="padding-right: 15px;">
+                        <ul class="pagination" style="margin: 0;">
+                            <li class="{if $current_page <= 1}disabled{/if}">
+                                <a href="{if $current_page > 1}{$page_url}&page={$current_page - 1}{else}#{/if}"><i class="icon-chevron-left"></i> Înapoi</a>
+                            </li>
+                            
+                            {for $p=1 to $total_pages}
+                                <li class="{if $current_page == $p}active{/if}">
+                                    <a href="{$page_url}&page={$p}">{$p}</a>
+                                </li>
+                            {/for}
+                            
+                            <li class="{if $current_page >= $total_pages}disabled{/if}">
+                                <a href="{if $current_page < $total_pages}{$page_url}&page={$current_page + 1}{else}#{/if}">Înainte <i class="icon-chevron-right"></i></a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        {/if}
     </div>
 </div>
