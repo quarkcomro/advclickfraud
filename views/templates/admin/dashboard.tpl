@@ -71,16 +71,16 @@
         <table class="table table-bordered">
             <thead>
                 <tr>
-                    <th><a href="{$sort_url}&order_by=ip_address&order_way={$next_order_way}">Adresă IP {if $order_by=='ip_address'}{if $order_way=='ASC'}<i class="icon-caret-up"></i>{else}<i class="icon-caret-down"></i>{if}{/if}</a></th>
-                    <th><a href="{$sort_url}&order_by=utm_source&order_way={$next_order_way}">Campanie {if $order_by=='utm_source'}{if $order_way=='ASC'}<i class="icon-caret-up"></i>{else}<i class="icon-caret-down"></i>{if}{/if}</a></th>
-                    <th><a href="{$sort_url}&order_by=click_count&order_way={$next_order_way}">Click-uri Ads {if $order_by=='click_count'}{if $order_way=='ASC'}<i class="icon-caret-up"></i>{else}<i class="icon-caret-down"></i>{if}{/if}</a></th>
-                    <th><a href="{$sort_url}&order_by=total_pages_visited&order_way={$next_order_way}">Pagini vizitate / oră {if $order_by=='total_pages_visited'}{if $order_way=='ASC'}<i class="icon-caret-up"></i>{else}<i class="icon-caret-down"></i>{if}{/if}</a></th>
-                    <th><a href="{$sort_url}&order_by=duration&order_way={$next_order_way}">Timp site {if $order_by=='duration'}{if $order_way=='ASC'}<i class="icon-caret-up"></i>{else}<i class="icon-caret-down"></i>{if}{/if}</a></th>
-                    <th><a href="{$sort_url}&order_by=mouse_movements&order_way={$next_order_way}">Interacțiune Mouse {if $order_by=='mouse_movements'}{if $order_way=='ASC'}<i class="icon-caret-up"></i>{else}<i class="icon-caret-down"></i>{if}{/if}</a></th>
+                    <th><a href="{$sort_url}&order_by=ip_address&order_way={$next_order_way}">Adresă IP {if $order_by=='ip_address'}{if $order_way=='ASC'}<i class="icon-caret-up"></i>{else}<i class="icon-caret-down"></i>{/if}{/if}</a></th>
+                    <th><a href="{$sort_url}&order_by=utm_source&order_way={$next_order_way}">Campanie {if $order_by=='utm_source'}{if $order_way=='ASC'}<i class="icon-caret-up"></i>{else}<i class="icon-caret-down"></i>{/if}{/if}</a></th>
+                    <th><a href="{$sort_url}&order_by=click_count&order_way={$next_order_way}">Click-uri Ads {if $order_by=='click_count'}{if $order_way=='ASC'}<i class="icon-caret-up"></i>{else}<i class="icon-caret-down"></i>{/if}{/if}</a></th>
+                    <th><a href="{$sort_url}&order_by=total_pages_visited&order_way={$next_order_way}">Pagini vizitate / oră {if $order_by=='total_pages_visited'}{if $order_way=='ASC'}<i class="icon-caret-up"></i>{else}<i class="icon-caret-down"></i>{/if}{/if}</a></th>
+                    <th><a href="{$sort_url}&order_by=duration&order_way={$next_order_way}">Timp site {if $order_by=='duration'}{if $order_way=='ASC'}<i class="icon-caret-up"></i>{else}<i class="icon-caret-down"></i>{/if}{/if}</a></th>
+                    <th><a href="{$sort_url}&order_by=mouse_movements&order_way={$next_order_way}">Interacțiune Mouse {if $order_by=='mouse_movements'}{if $order_way=='ASC'}<i class="icon-caret-up"></i>{else}<i class="icon-caret-down"></i>{/if}{/if}</a></th>
                     <th>Rezoluție</th>
-                    <th><a href="{$sort_url}&order_by=fraud_score&order_way={$next_order_way}">Scor Fraudă {if $order_by=='fraud_score'}{if $order_way=='ASC'}<i class="icon-caret-up"></i>{else}<i class="icon-caret-down"></i>{if}{/if}</a></th>
+                    <th><a href="{$sort_url}&order_by=fraud_score&order_way={$next_order_way}">Scor Fraudă {if $order_by=='fraud_score'}{if $order_way=='ASC'}<i class="icon-caret-up"></i>{else}<i class="icon-caret-down"></i>{/if}{/if}</a></th>
                     <th>Tip Risc</th>
-                    <th><a href="{$sort_url}&order_by=date_upd&order_way={$next_order_way}">Ultima vizită {if $order_by=='date_upd'}{if $order_way=='ASC'}<i class="icon-caret-up"></i>{else}<i class="icon-caret-down"></i>{if}{/if}</a></th>
+                    <th><a href="{$sort_url}&order_by=date_upd&order_way={$next_order_way}">Ultima vizită {if $order_by=='date_upd'}{if $order_way=='ASC'}<i class="icon-caret-up"></i>{else}<i class="icon-caret-down"></i>{/if}{/if}</a></th>
                 </tr>
             </thead>
 
