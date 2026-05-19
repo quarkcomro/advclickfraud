@@ -55,6 +55,17 @@
     </form>
 </div>
 
+<!-- Afișarea URL-ului de Export -->
+<div class="panel">
+    <div class="panel-heading"><i class="icon-link"></i> {l s='Integrare și Automatizare Google Ads' mod='advclickfraud'}</div>
+    <div class="alert alert-info">
+        <p>Folosește URL-ul de mai jos în scripturile tale de automatizare sau în instrumentele de rețea pentru a prelua în timp real lista IP-urilor marcate cu <strong>Fraudă Critică</strong>:</p>
+        <br/>
+        <code style="font-size: 14px; padding: 10px; display: block; word-break: break-all;">{$export_link}</code>
+    </div>
+</div>
+
+
 <!-- Jurnal detaliat de analiză -->
 <div class="panel">
     <div class="panel-heading">
