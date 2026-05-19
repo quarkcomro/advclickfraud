@@ -90,7 +90,7 @@
                             <td>{$log.screen_resolution|escape:'html':'UTF-8'}</td>
                             <td>
                                 <div class="progress" style="margin-bottom:0;">
-                                    <div class="progress-bar {if $log.fraud_score >= 70}progress-bar-danger{elif $log.fraud_score >= 40}progress-bar-warning{else}progress-bar-success{/if}" 
+                                    <div class="progress-bar {if $log.fraud_score >= 70}progress-bar-danger{elseif $log.fraud_score >= 40}progress-bar-warning{else}progress-bar-success{/if}"
                                          role="progressbar" style="width: {$log.fraud_score|intval}%;">
                                         {$log.fraud_score|intval}%
                                     </div>
