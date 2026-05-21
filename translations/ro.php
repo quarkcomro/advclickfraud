@@ -46,5 +46,11 @@ $_MODULE['<{advclickfraud}prestashop>dashboard_page1e5f36ad2e76f4e8b38bfdef'] = 
 $_MODULE['<{advclickfraud}prestashop>dashboard_page2e5f36ad2e76f4e8b38bfdef'] = 'of';
 $_MODULE['<{advclickfraud}prestashop>dashboard_btn1e5f36ad2e76f4e8b38bfdef1'] = 'Back';
 $_MODULE['<{advclickfraud}prestashop>dashboard_btn2e5f36ad2e76f4e8b38bfdef1'] = 'Next';
+$_MODULE['<{advclickfraud}prestashop>advclickfraud_b8a3db982b6bca3115456fefef83ddaa'] = 'Toate logurile și metricile comportamentale au fost resetate cu succes.';
+$_MODULE['<{advclickfraud}prestashop>advclickfraud_c8a3db982b6bca3115456fefef83ddaa'] = 'A apărut o eroare la resetarea statisticilor din baza de date.';
+$_MODULE['<{advclickfraud}prestashop>dashboard_d8a3db982b6bca3115456fefef83ddaa'] = 'Resetează Statisticile Analitice';
+$_MODULE['<{advclickfraud}prestashop>advclickfraud_b8a3db982b6bca3115456fefef83ddaa'] = 'All logs and behavioral metrics have been successfully reset.';
+$_MODULE['<{advclickfraud}prestashop>advclickfraud_c8a3db982b6bca3115456fefef83ddaa'] = 'An error occurred while resetting database statistics.';
+$_MODULE['<{advclickfraud}prestashop>dashboard_d8a3db982b6bca3115456fefef83ddaa'] = 'Reset Analytics Statistics';
 
 return $_MODULE;
