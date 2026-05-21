@@ -1,12 +1,11 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <module>
     <name>advclickfraud</name>
-    <displayName><![CDATA[Advanced Click Fraud Detector & Analytics]]></displayName>
-    <version><![CDATA]></version>
-    <description><![CDATA[Detectează și monitorizează click-urile frauduloase din campaniile publicitare (Google Ads, Facebook Ads) prin amprentare digitală și analiza comportamentului utilizatorilor.]]></description>
+    <displayName><![CDATA[Advanced Click Fraud Detector and Analytics]]></displayName>
+    <version><![CDATA[1.6.0]]></version>
+    <description><![CDATA[Detects malicious behavior, price scrapers, and repetitive ad clicks with hardware fingerprinting, cloudflare integration, and automated geofencing.]]></description>
     <author><![CDATA[Expert Developer]]></author>
     <tab><![CDATA[analytics_stats]]></tab>
     <is_configurable>1</is_configurable>
     <need_instance>1</need_instance>
-    <limited_countries></limited_countries>
 </module>
